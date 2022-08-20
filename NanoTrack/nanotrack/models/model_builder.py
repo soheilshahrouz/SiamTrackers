@@ -114,6 +114,36 @@ class NanoTrackTemplateMaker(nn.Module):
         return z_f
 
 
+
+class BBPostProcessing(nn.Module):
+    def __init__(self, size=16, stride=16):
+        super(BBPostProcessing, self).__init__()
+
+        ori = - (size // 2) * stride
+        x, y = np.meshgrid([ori + stride * dx for dx in np.arange(0, size)],
+                           [ori + stride * dy for dy in np.arange(0, size)])
+        points = np.zeros((size * size, 2), dtype=np.float32)
+        points[:, 0], points[:, 1] = x.astype(np.float32).flatten(), y.astype(np.float32).flatten()
+        self.points0 = nn.Parameter( torch.from_numpy(x.astype(np.float32).flatten()) )
+        self.points1 = nn.Parameter( torch.from_numpy(y.astype(np.float32).flatten()) )
+
+    def forward(self, delta):
+
+        delta = delta.permute(1, 2, 3, 0).view(4, -1)
+
+        delta0 = self.points0 - delta[0, :] #x1
+        delta1 = self.points1 - delta[1, :] #y1
+        delta2 = self.points0 + delta[2, :] #x2
+        delta3 = self.points1 + delta[3, :] #y2
+
+        x = (delta0 + delta2) * 0.5
+        y = (delta1 + delta3) * 0.5
+        w = delta2 - delta0
+        h = delta3 - delta1
+
+        return x, y, w, h
+
+
 class NanoTrackForward(nn.Module):
     def __init__(self, model):
         super(NanoTrackForward, self).__init__()
@@ -121,15 +151,8 @@ class NanoTrackForward(nn.Module):
         self.backbone = model.backbone
         self.ban_head = model.ban_head
 
-        stride = 16
-        size = 16
+        self.bb_pp = BBPostProcessing()
 
-        ori = - (size // 2) * stride
-        x, y = np.meshgrid([ori + stride * dx for dx in np.arange(0, size)],
-                           [ori + stride * dy for dy in np.arange(0, size)])
-        points = np.zeros((size * size, 2), dtype=np.float32)
-        points[:, 0], points[:, 1] = x.astype(np.float32).flatten(), y.astype(np.float32).flatten()
-        self.points = nn.Parameter( torch.from_numpy(points) )
 
     def forward(self, x, z_f):
         
@@ -141,16 +164,6 @@ class NanoTrackForward(nn.Module):
         cls = cls.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0)
         cls = cls.softmax(1)[:, 1]
 
-        delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1)
-
-        delta[0, :] = self.points[:, 0] - delta[0, :] #x1
-        delta[1, :] = self.points[:, 1] - delta[1, :] #y1
-        delta[2, :] = self.points[:, 0] + delta[2, :] #x2
-        delta[3, :] = self.points[:, 1] + delta[3, :] #y2
-
-        x = (delta[0, :] + delta[2, :]) * 0.5
-        y = (delta[1, :] + delta[3, :]) * 0.5
-        w = delta[2, :] - delta[0, :]
-        h = delta[3, :] - delta[1, :]
+        x, y, w, h = self.bb_pp(delta)
         
         return x, y, w, h, cls
