@@ -1,5 +1,3 @@
-# Copyright (c) SenseTime. All Rights Reserved.
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -112,3 +110,33 @@ class NanoTrackTemplateMaker(nn.Module):
         z_perm = z.permute((0, 3, 1, 2))
         z_f = self.backbone(z_perm)
         return z_f
+
+
+class NanoTrackForward(nn.Module):
+    def __init__(self, model):
+        super(NanoTrackForward, self).__init__()
+
+        self.backbone = model.backbone
+        self.ban_head = model.ban_head
+
+    def forward(self, x, z_f):
+        
+        x_perm = x.permute((0, 3, 1, 2))
+
+        xf = self.backbone(x_perm)  
+        cls, delta = self.ban_head(z_f, xf) 
+
+        delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1)
+        
+        # bbox_pred, cls_score = oup['reg'], oup['cls']
+        # return oup['reg'], oup['cls']
+
+        # cls_score = F.sigmoid(cls_score).squeeze()
+
+        # bbox_pred = bbox_pred.squeeze()
+
+        # pred_xs, pred_ys, pred_w, pred_h = self.bb_pp(bbox_pred)
+
+        # return pred_xs, pred_ys, pred_w, pred_h, cls_score
+
+        return delta[0, :], delta[1, :], delta[2, :], delta[3, :], cls
