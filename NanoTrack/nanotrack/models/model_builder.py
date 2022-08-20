@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+
 from nanotrack.core.config import cfg
 from nanotrack.models.loss import select_cross_entropy_loss, select_iou_loss
 from nanotrack.models.backbone import get_backbone
@@ -119,6 +121,16 @@ class NanoTrackForward(nn.Module):
         self.backbone = model.backbone
         self.ban_head = model.ban_head
 
+        stride = 16
+        size = 16
+
+        ori = - (size // 2) * stride
+        x, y = np.meshgrid([ori + stride * dx for dx in np.arange(0, size)],
+                           [ori + stride * dy for dy in np.arange(0, size)])
+        points = np.zeros((size * size, 2), dtype=np.float32)
+        points[:, 0], points[:, 1] = x.astype(np.float32).flatten(), y.astype(np.float32).flatten()
+        self.points = nn.Parameter( torch.from_numpy(points) )
+
     def forward(self, x, z_f):
         
         x_perm = x.permute((0, 3, 1, 2))
@@ -126,17 +138,19 @@ class NanoTrackForward(nn.Module):
         xf = self.backbone(x_perm)  
         cls, delta = self.ban_head(z_f, xf) 
 
+        cls = cls.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0)
+        cls = cls.softmax(1)[:, 1]
+
         delta = delta.permute(1, 2, 3, 0).contiguous().view(4, -1)
+
+        delta[0, :] = self.points[:, 0] - delta[0, :] #x1
+        delta[1, :] = self.points[:, 1] - delta[1, :] #y1
+        delta[2, :] = self.points[:, 0] + delta[2, :] #x2
+        delta[3, :] = self.points[:, 1] + delta[3, :] #y2
+
+        x = (delta[0, :] + delta[2, :]) * 0.5
+        y = (delta[1, :] + delta[3, :]) * 0.5
+        w = delta[2, :] - delta[0, :]
+        h = delta[3, :] - delta[1, :]
         
-        # bbox_pred, cls_score = oup['reg'], oup['cls']
-        # return oup['reg'], oup['cls']
-
-        # cls_score = F.sigmoid(cls_score).squeeze()
-
-        # bbox_pred = bbox_pred.squeeze()
-
-        # pred_xs, pred_ys, pred_w, pred_h = self.bb_pp(bbox_pred)
-
-        # return pred_xs, pred_ys, pred_w, pred_h, cls_score
-
-        return delta[0, :], delta[1, :], delta[2, :], delta[3, :], cls
+        return x, y, w, h, cls
