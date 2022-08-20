@@ -9,7 +9,7 @@ echo ""
 echo ""
 echo "****************** Installing pytorch with cuda10 ******************"
 #  pytorch 版本建议你选择1.5以上版本， 我这里选择的是1.1低版本
-conda install pytorch==1.7.0 cudatoolkit=10.0
+conda install pytorch==1.7.0 torchvision==0.8.0 torchaudio==0.7.0 cudatoolkit=10.2 -c pytorch
 
 echo ""
 echo ""
