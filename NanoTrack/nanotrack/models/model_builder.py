@@ -100,3 +100,15 @@ class ModelBuilder(nn.Module):
                     'loc': loc,
                 }
 
+
+
+class NanoTrackTemplateMaker(nn.Module):
+    def __init__(self, model):
+        super(NanoTrackTemplateMaker, self).__init__()
+
+        self.backbone = model.backbone
+
+    def forward(self, z):
+        z_perm = z.permute((0, 3, 1, 2))
+        z_f = self.backbone(z_perm)
+        return z_f

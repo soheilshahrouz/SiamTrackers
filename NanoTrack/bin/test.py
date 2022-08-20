@@ -18,14 +18,14 @@ sys.path.append(os.getcwd())
 from tqdm import tqdm 
 
 from nanotrack.core.config import cfg
-from nanotrack.models.model_builder import ModelBuilder
+from nanotrack.models.model_builder import ModelBuilder, NanoTrackTemplateMaker
 from nanotrack.tracker.tracker_builder import build_tracker
 from nanotrack.utils.bbox import get_axis_aligned_bbox
 from nanotrack.utils.model_load import load_pretrain
 from toolkit.datasets import DatasetFactory
 from toolkit.utils.region import vot_overlap, vot_float2str
 
-from bin.eval import eval
+# from bin.eval import eval
 
 parser = argparse.ArgumentParser(description='nanotrack') 
 
@@ -80,7 +80,21 @@ def main():
 
     # load model 
     model = load_pretrain(model, args.snapshot).cuda().eval()
+
+
+    temp_model = NanoTrackTemplateMaker(model).cuda()
+    dummy_input = torch.randn(1, 127, 127, 3, device="cuda")
+    input_names  = [ "template_maker_input" ]
+    output_names = [ "template_maker_kernel_output"]
+
+    torch.onnx.export(temp_model, dummy_input, "LightTrack_Template_Maker.onnx", export_params=True,
+        verbose=True, input_names=input_names, output_names=output_names)
+
+
     
+    exit()
+
+
     # build tracker 
     tracker = build_tracker(model)
     
