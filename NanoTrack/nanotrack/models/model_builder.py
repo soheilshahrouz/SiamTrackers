@@ -116,24 +116,32 @@ class NanoTrackTemplateMaker(nn.Module):
 
 
 class BBPostProcessing(nn.Module):
-    def __init__(self, size=16, stride=16):
+    def __init__(self, mem_len=1, size=16, stride=16):
         super(BBPostProcessing, self).__init__()
 
         ori = - (size // 2) * stride
         x, y = np.meshgrid([ori + stride * dx for dx in np.arange(0, size)],
                            [ori + stride * dy for dy in np.arange(0, size)])
         
-        self.points0 = nn.Parameter( torch.from_numpy(x.astype(np.float32).flatten()) )
-        self.points1 = nn.Parameter( torch.from_numpy(y.astype(np.float32).flatten()) )
+        x_tiled = np.tile(x, (mem_len, 1, 1))
+        y_tiled = np.tile(y, (mem_len, 1, 1))
+        
+        self.mem_len = mem_len
+        self.score_size = x.shape[0]
+
+        self.points0 = nn.Parameter( torch.from_numpy(x_tiled.astype(np.float32)) )
+        self.points1 = nn.Parameter( torch.from_numpy(y_tiled.astype(np.float32)) )
 
     def forward(self, delta):
 
-        delta = delta.permute(1, 2, 3, 0).view(4, -1)
+        # delta = delta.permute(1, 2, 3, 0).view(4, -1)
 
-        delta0 = self.points0 - delta[0, :] #x1
-        delta1 = self.points1 - delta[1, :] #y1
-        delta2 = self.points0 + delta[2, :] #x2
-        delta3 = self.points1 + delta[3, :] #y2
+        delta = delta.view(self.mem_len, 4, self.score_size, self.score_size)
+
+        delta0 = self.points0 - delta[:, 0, :] #x1
+        delta1 = self.points1 - delta[:, 1, :] #y1
+        delta2 = self.points0 + delta[:, 2, :] #x2
+        delta3 = self.points1 + delta[:, 3, :] #y2
 
         x = (delta0 + delta2) * 0.5
         y = (delta1 + delta3) * 0.5
@@ -169,13 +177,13 @@ class NanoTrackForward(nn.Module):
 
 
 class THORNanoTrackForward(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, mem_len):
         super(THORNanoTrackForward, self).__init__()
 
         self.backbone = model.backbone
         self.ban_head = model.ban_head
 
-        self.bb_pp = BBPostProcessing()
+        self.bb_pp = BBPostProcessing(mem_len)
 
 
     def forward(self, x, z_f):
@@ -189,13 +197,12 @@ class THORNanoTrackForward(nn.Module):
         delta_list = [o[1] for o in out]
         cls = torch.cat(cls_list, dim=0)
         delta = torch.cat(delta_list, dim=0)
-        # cls, delta = self.ban_head(z_f, xf) 
 
         # cls = cls.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0)
         # cls = cls.softmax(1)[:, 1]
 
-        # x, y, w, h = self.bb_pp(delta)
+        x, y, w, h = self.bb_pp(delta)
         
-        # return x, y, w, h, cls
-        return delta, cls
+        return x, y, w, h, cls
+        # return delta, cls
 
