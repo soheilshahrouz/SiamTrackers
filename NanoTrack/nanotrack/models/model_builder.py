@@ -122,8 +122,7 @@ class BBPostProcessing(nn.Module):
         ori = - (size // 2) * stride
         x, y = np.meshgrid([ori + stride * dx for dx in np.arange(0, size)],
                            [ori + stride * dy for dy in np.arange(0, size)])
-        points = np.zeros((size * size, 2), dtype=np.float32)
-        points[:, 0], points[:, 1] = x.astype(np.float32).flatten(), y.astype(np.float32).flatten()
+        
         self.points0 = nn.Parameter( torch.from_numpy(x.astype(np.float32).flatten()) )
         self.points1 = nn.Parameter( torch.from_numpy(y.astype(np.float32).flatten()) )
 
