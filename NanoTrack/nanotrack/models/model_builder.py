@@ -166,3 +166,36 @@ class NanoTrackForward(nn.Module):
         x, y, w, h = self.bb_pp(delta)
         
         return x, y, w, h, cls
+
+
+class THORNanoTrackForward(nn.Module):
+    def __init__(self, model):
+        super(THORNanoTrackForward, self).__init__()
+
+        self.backbone = model.backbone
+        self.ban_head = model.ban_head
+
+        self.bb_pp = BBPostProcessing()
+
+
+    def forward(self, x, z_f):
+        
+        x_perm = x.permute((0, 3, 1, 2))
+        z_f_list = list(z_f)
+
+        xf = self.backbone(x_perm)  
+        out = [self.ban_head(z, xf) for z in z_f_list]
+        cls_list = [o[0] for o in out]
+        delta_list = [o[1] for o in out]
+        cls = torch.cat(cls_list, dim=0)
+        delta = torch.cat(delta_list, dim=0)
+        # cls, delta = self.ban_head(z_f, xf) 
+
+        # cls = cls.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0)
+        # cls = cls.softmax(1)[:, 1]
+
+        # x, y, w, h = self.bb_pp(delta)
+        
+        # return x, y, w, h, cls
+        return delta, cls
+

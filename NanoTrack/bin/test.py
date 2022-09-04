@@ -18,7 +18,7 @@ sys.path.append(os.getcwd())
 from tqdm import tqdm 
 
 from nanotrack.core.config import cfg
-from nanotrack.models.model_builder import ModelBuilder, NanoTrackTemplateMaker, NanoTrackForward
+from nanotrack.models.model_builder import ModelBuilder, NanoTrackTemplateMaker, NanoTrackForward, THORNanoTrackForward
 from nanotrack.tracker.tracker_builder import build_tracker
 from nanotrack.utils.bbox import get_axis_aligned_bbox
 from nanotrack.utils.model_load import load_pretrain
@@ -81,6 +81,19 @@ def main():
     # load model 
     model = load_pretrain(model, args.snapshot).cuda().eval()
 
+    n_templates = 7
+    thor_forw_model = THORNanoTrackForward(model).cuda()
+    dummy_input = torch.randn(1, 255, 255, 3, device="cuda")
+    dummy_kernel = torch.randn(n_templates, 48, 8, 8, device="cuda")
+    input_names  = [ "forward_input", "forward_kernel" ]
+    output_names = [ "forward_delta3_output", "forward_cls_output" ]
+
+    torch.onnx.export(thor_forw_model, (dummy_input, dummy_kernel), "THORNanoTrack_Forward.onnx", export_params=True,
+        verbose=True, input_names=input_names, output_names=output_names)
+    
+
+
+    exit()
 
     temp_model = NanoTrackTemplateMaker(model).cuda().eval()
     dummy_input = torch.randn(1, 127, 127, 3, device="cuda")
