@@ -184,6 +184,7 @@ class THORNanoTrackForward(nn.Module):
         self.ban_head = model.ban_head
 
         self.bb_pp = BBPostProcessing(mem_len)
+        self.mem_len = mem_len
 
 
     def forward(self, x, z_f):
@@ -198,8 +199,8 @@ class THORNanoTrackForward(nn.Module):
         cls = torch.cat(cls_list, dim=0)
         delta = torch.cat(delta_list, dim=0)
 
-        # cls = cls.permute(1, 2, 3, 0).contiguous().view(2, -1).permute(1, 0)
-        # cls = cls.softmax(1)[:, 1]
+        cls = cls.view(self.mem_len, 2, -1)
+        cls = cls.softmax(1)[:, 1, :]
 
         x, y, w, h = self.bb_pp(delta)
         
