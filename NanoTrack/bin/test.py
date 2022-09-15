@@ -90,10 +90,7 @@ def main():
 
     torch.onnx.export(thor_forw_model, (dummy_input, dummy_kernel), "THORNanoTrack_Forward.onnx", export_params=True,
         verbose=True, input_names=input_names, output_names=output_names)
-    
 
-
-    exit()
 
     temp_model = NanoTrackTemplateMaker(model).cuda().eval()
     dummy_input = torch.randn(1, 127, 127, 3, device="cuda")
