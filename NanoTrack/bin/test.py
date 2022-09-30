@@ -81,15 +81,15 @@ def main():
     # load model 
     model = load_pretrain(model, args.snapshot).cuda().eval()
 
-    n_templates = 7
-    thor_forw_model = THORNanoTrackForward(model, n_templates).cuda()
-    dummy_input = torch.randn(1, 255, 255, 3, device="cuda")
-    dummy_kernel = torch.randn(n_templates, 48, 8, 8, device="cuda")
-    input_names  = [ "forward_input", "forward_kernel" ]
-    output_names = [ "forward_delta0_output", "forward_delta1_output", "forward_delta2_output", "forward_delta3_output", "forward_cls_output" ]
+    for n_templates in range(5, 16):
+        thor_forw_model = THORNanoTrackForward(model, n_templates).cuda()
+        dummy_input = torch.randn(1, 255, 255, 3, device="cuda")
+        dummy_kernel = torch.randn(n_templates, 48, 8, 8, device="cuda")
+        input_names  = [ "forward_input", "forward_kernel" ]
+        output_names = [ "forward_delta0_output", "forward_delta1_output", "forward_delta2_output", "forward_delta3_output", "forward_cls_output" ]
 
-    torch.onnx.export(thor_forw_model, (dummy_input, dummy_kernel), "THORNanoTrack_Forward.onnx", export_params=True,
-        verbose=True, input_names=input_names, output_names=output_names)
+        torch.onnx.export(thor_forw_model, (dummy_input, dummy_kernel), "NanoTrack_Forward_THOR" + str(n_templates) + ".onnx",
+            export_params=True, verbose=True, input_names=input_names, output_names=output_names)
 
 
     temp_model = NanoTrackTemplateMaker(model).cuda().eval()
